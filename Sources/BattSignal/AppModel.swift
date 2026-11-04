@@ -1,0 +1,163 @@
+import BattSignalCore
+import Foundation
+import OSLog
+
+private let log = Logger(subsystem: "org.mnalavadi.battsignal", category: "model")
+
+@MainActor
+final class AppModel: ObservableObject {
+    @Published private(set) var local: Snapshot?
+    @Published private(set) var devices: [Snapshot] = []
+    @Published private(set) var scanProblem: String?
+    @Published private(set) var saveProblem: String?
+    @Published private(set) var isScanning = false
+    @Published private(set) var lastUpdated: Date?
+    @Published private(set) var lastScanSucceededAt: Date?
+
+    private(set) var host = HostIdentity.current()
+    let store = FleetStore(root: FleetStore.iCloudRoot)
+    private let cli = MobileDeviceCLI.locate()
+    private let defaults = UserDefaults.standard
+
+    private var lastWrite: [String: (at: Date, reading: BatteryReading)] = [:]
+    private var lastHistory: [String: Date] = [:]
+    private var loops: [Task<Void, Never>] = []
+    private var powerWatcher: PowerSourceWatcher?
+
+    private static let localInterval: Duration = .seconds(60)
+    private static let observationMaxAge: TimeInterval = 10 * 60
+    private static let historyInterval: TimeInterval = 15 * 60 - 30
+
+
+    init() {
+        SettingsKey.registerDefaults()
+        loops = [
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    self?.refreshLocal()
+                    try? await Task.sleep(for: Self.localInterval)
+                }
+            },
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    await self?.scanDevices()
+                    let minutes = max(self?.defaults.integer(forKey: SettingsKey.scanMinutes) ?? SettingsKey.defaultScanMinutes, 1)
+                    try? await Task.sleep(for: .seconds(minutes * 60))
+                }
+            },
+        ]
+        powerWatcher = PowerSourceWatcher { [weak self] in self?.refreshLocal() }
+    }
+
+    deinit {
+        loops.forEach { $0.cancel() }
+    }
+
+    var thisMacID: String { host.id }
+
+    func refreshLocal() {
+        host = HostIdentity.current()
+        if let reading = MacBattery.read() {
+            let snapshot = Snapshot(device: host.device, observer: host.observer, observedAt: .now, battery: reading)
+            local = snapshot
+            record(snapshot)
+        }
+        reloadFleet()
+    }
+
+    func scanDevices() async {
+        guard !isScanning else { return }
+        guard let cli else {
+            scanProblem = "pymobiledevice3 isn't installed, so iPhones and iPads can't be read."
+            return
+        }
+        isScanning = true
+        defer { isScanning = false }
+
+        do {
+            let found = try await cli.listDevices()
+            var failures: [String] = []
+            for device in found {
+                do {
+                    let reading = try await cli.battery(udid: device.udid)
+                    record(Snapshot(device: device.info, observer: host.observer, observedAt: .now, battery: reading))
+                } catch {
+                    log.error("Reading \(device.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                    failures.append(device.name)
+                }
+            }
+            if !found.isEmpty, failures.isEmpty { lastScanSucceededAt = .now }
+            scanProblem = failures.isEmpty
+                ? nil
+                : "Couldn't read \(failures.joined(separator: ", ")). It may be asleep or off this Wi-Fi."
+        } catch {
+            scanProblem = "Scan failed: \(error.localizedDescription)"
+        }
+        log.notice("Scan finished: \(self.scanProblem ?? "ok", privacy: .public)")
+        reloadFleet()
+    }
+
+    func history(for deviceID: String) -> [HistoryPoint] {
+        store.readHistory(deviceID: deviceID)
+    }
+
+    private func record(_ snapshot: Snapshot) {
+        let id = snapshot.device.id
+
+        let changed = lastWrite[id].map {
+            $0.reading.level != snapshot.battery.level
+                || $0.reading.isCharging != snapshot.battery.isCharging
+                || $0.reading.externalPower != snapshot.battery.externalPower
+                || snapshot.observedAt.timeIntervalSince($0.at) >= Self.observationMaxAge
+        } ?? true
+        if changed {
+            do {
+                try store.write(snapshot)
+                lastWrite[id] = (snapshot.observedAt, snapshot.battery)
+                saveProblem = nil
+            } catch {
+                saveProblem = "Couldn't save to iCloud Drive: \(error.localizedDescription)"
+            }
+        }
+
+        if snapshot.observedAt.timeIntervalSince(lastHistory[id] ?? .distantPast) >= Self.historyInterval {
+            do {
+                try store.appendHistory(snapshot)
+                lastHistory[id] = snapshot.observedAt
+            } catch {
+                log.error("History append for \(snapshot.device.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    private func reloadFleet() {
+        let all = FleetStore.latestPerDevice(store.readAll() + [local].compactMap { $0 })
+        let localID = host.id
+        devices = all.sorted { a, b in
+            if (a.id == localID) != (b.id == localID) { return a.id == localID }
+            if a.device.kind != b.device.kind { return a.device.kind.sortOrder < b.device.kind.sortOrder }
+            return a.device.name.localizedStandardCompare(b.device.name) == .orderedAscending
+        }
+        lastUpdated = .now
+    }
+}
+
+extension DeviceKind {
+    var sortOrder: Int {
+        switch self {
+        case .mac: 0
+        case .iphone: 1
+        case .ipad: 2
+        case .other: 3
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .mac: "laptopcomputer"
+        case .iphone: "iphone"
+        case .ipad: "ipad"
+        case .other: "battery.75percent"
+        }
+    }
+}

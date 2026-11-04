@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="-24.3 -24.3 248.6 248.6">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2a4a"/><stop offset="1" stop-color="#070c18"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="1" x2="0.6" y2="0">
+      <stop offset="0" stop-color="#ffe27a" stop-opacity="0.9"/><stop offset="1" stop-color="#ffe27a" stop-opacity="0.15"/>
+    </linearGradient>
+    <radialGradient id="disc" cx="0.5" cy="0.5" r="0.6">
+      <stop offset="0" stop-color="#fff2b0"/><stop offset="1" stop-color="#f2c230"/>
+    </radialGradient>
+    <clipPath id="sq"><rect width="200" height="200" rx="46"/></clipPath>
+  </defs>
+  <g clip-path="url(#sq)">
+    <rect width="200" height="200" fill="url(#sky)"/>
+    <ellipse cx="40" cy="78" rx="46" ry="16" fill="#2c3a5c" opacity="0.8"/>
+    <ellipse cx="170" cy="96" rx="44" ry="15" fill="#2c3a5c" opacity="0.8"/>
+    <ellipse cx="110" cy="40" rx="60" ry="14" fill="#24304e" opacity="0.9"/>
+    <polygon points="36,192 62,198 172,88 70,48" fill="url(#beam)"/>
+    <ellipse cx="118" cy="70" rx="58" ry="36" fill="url(#disc)" transform="rotate(-12 118 70)"/>
+    <g transform="rotate(-12 118 70)">
+      <rect x="88" y="55" width="54" height="30" rx="6" fill="#0b1324"/>
+      <rect x="142" y="63" width="6" height="14" rx="2" fill="#0b1324"/>
+      <polygon points="119,58 105,73 115,73 110,83 126,67 116,67 121,58" fill="#f6cf3c"/>
+    </g>
+    <rect x="26" y="176" width="34" height="20" rx="4" fill="#3a465f" transform="rotate(-40 43 186)"/>
+    <ellipse cx="54" cy="174" rx="8" ry="12" fill="#ffe27a" transform="rotate(-40 54 174)"/>
+  </g>
+</svg>
