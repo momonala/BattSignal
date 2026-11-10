@@ -97,6 +97,7 @@ final class BatteryReadingTests: XCTestCase {
         XCTAssertEqual(BatteryReading(level: 80, isCharging: false, externalPower: true, fullyCharged: false).chargeState, .pluggedIn)
         XCTAssertEqual(BatteryReading(level: 19, isCharging: false, externalPower: false).chargeState, .low)
         XCTAssertEqual(BatteryReading(level: 20, isCharging: false, externalPower: false).chargeState, .onBattery)
+        XCTAssertEqual(BatteryReading(level: 99, isCharging: false, externalPower: false).chargeState, .onBattery)
         XCTAssertEqual(BatteryReading(level: 100, isCharging: false, externalPower: false).chargeState, .full)
         XCTAssertEqual(BatteryReading().chargeState, .normal)
     }

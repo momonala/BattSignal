@@ -112,4 +112,8 @@ final class IOSDeviceParsingTests: XCTestCase {
         XCTAssertEqual(devices.map(\.kind), [.iphone, .ipad])
         XCTAssertEqual(devices.first?.info.osVersion, "iOS 26.7.1")
     }
+
+    func testUnknownProductTypeFallsBackToIdentifier() {
+        XCTAssertEqual(ProductNames.display("Mac17,9"), "Mac17,9")
+    }
 }
