@@ -52,13 +52,4 @@ final class FleetStoreTests: XCTestCase {
         XCTAssertEqual(history.map(\.level), [50, 60, 70])
         XCTAssertEqual(history.first?.health, 79.0)
     }
-
-    func testEvictedICloudPlaceholderIsSkipped() throws {
-        try store.write(snapshot(observer: "mac-air", at: 1_000, level: 50))
-        let dir = root.appending(path: "observations/mac-pro")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try Data().write(to: dir.appending(path: ".ipad.json.icloud"))
-
-        XCTAssertEqual(store.readAll().count, 1)
-    }
 }

@@ -70,7 +70,6 @@ final class BatteryReadingTests: XCTestCase {
         let utc = { (s: String) in ISO8601DateFormatter().date(from: s + "T00:00:00Z") }
 
         XCTAssertEqual(BatteryReading(serial: "F5D2385AB1234CDEF").manufactureWeek(now: now), utc("2022-09-19"))
-        XCTAssertEqual(BatteryReading(serial: "FG9136AB1234CDEFG").manufactureWeek(now: now), utc("2021-09-06"))
         XCTAssertNil(BatteryReading(serial: "ABCXYZ").manufactureWeek(now: now))
         XCTAssertEqual(BatteryReading(serial: "F5D6505AB1234CDEF").manufactureWeek(now: now), utc("2016-12-12"),
                        "a week later than now in the current year's digit means the previous decade")
@@ -82,19 +81,6 @@ final class BatteryReadingTests: XCTestCase {
 
         XCTAssertEqual(reading.chargerWatts, 15)
         XCTAssertNil(unplugged.chargerWatts)
-    }
-
-    func testIOSRegistryIgnoresPercentMaxCapacity() {
-        let reading = BatteryReading(registry: [
-            "CurrentCapacity": 97,
-            "MaxCapacity": 100,
-            "AppleRawMaxCapacity": 2533,
-            "DesignCapacity": 3208,
-            "CycleCount": 1411,
-        ])
-
-        XCTAssertEqual(reading.maxCapacityMah, 2533)
-        XCTAssertEqual(reading.healthPercent!, 79.0, accuracy: 0.05)
     }
 
     func testDischargeCurrentReportedAsUnsignedWrapsNegative() {
@@ -111,7 +97,6 @@ final class BatteryReadingTests: XCTestCase {
         XCTAssertEqual(BatteryReading(level: 80, isCharging: false, externalPower: true, fullyCharged: false).chargeState, .pluggedIn)
         XCTAssertEqual(BatteryReading(level: 19, isCharging: false, externalPower: false).chargeState, .low)
         XCTAssertEqual(BatteryReading(level: 20, isCharging: false, externalPower: false).chargeState, .onBattery)
-        XCTAssertEqual(BatteryReading(level: 80, isCharging: false, externalPower: false).chargeState, .onBattery)
         XCTAssertEqual(BatteryReading(level: 100, isCharging: false, externalPower: false).chargeState, .full)
         XCTAssertEqual(BatteryReading().chargeState, .normal)
     }

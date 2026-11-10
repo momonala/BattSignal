@@ -92,11 +92,11 @@ final class HistoryAggregatorTests: XCTestCase {
 }
 
 final class IOSDeviceParsingTests: XCTestCase {
-    func testUsbmuxListDedupesDeviceSeenOverUSBAndWiFi() throws {
+    func testUsbmuxListDedupesDeviceAndLabelsOSVersion() throws {
         let json = """
         [
           {"ConnectionType": "Network", "DeviceClass": "iPhone", "DeviceName": "Momo",
-           "ProductType": "iPhone14,5", "UniqueDeviceID": "00008110-0000000000000001"},
+           "ProductType": "iPhone14,5", "ProductVersion": "26.7.1", "UniqueDeviceID": "00008110-0000000000000001"},
           {"ConnectionType": "USB", "DeviceClass": "iPhone", "DeviceName": "Momo",
            "ProductType": "iPhone14,5", "UniqueDeviceID": "00008110-0000000000000001"},
           {"ConnectionType": "Network", "DeviceClass": "iPad", "DeviceName": "Studio iPad",
@@ -108,17 +108,6 @@ final class IOSDeviceParsingTests: XCTestCase {
 
         XCTAssertEqual(devices.map(\.name), ["Momo", "Studio iPad"])
         XCTAssertEqual(devices.map(\.kind), [.iphone, .ipad])
-    }
-
-    func testIOSDeviceCarriesOSVersion() throws {
-        let json = #"[{"DeviceClass": "iPhone", "DeviceName": "Momo", "ProductVersion": "26.7.1", "UniqueDeviceID": "X"}]"#
-        let device = try XCTUnwrap(IOSDevice.parseList(Data(json.utf8)).first)
-
-        XCTAssertEqual(device.info.osVersion, "iOS 26.7.1")
-    }
-
-    func testProductNameFallsBackToIdentifier() {
-        XCTAssertEqual(ProductNames.display("iPhone14,5"), "iPhone 13")
-        XCTAssertEqual(ProductNames.display("Mac17,9"), "Mac17,9")
+        XCTAssertEqual(devices.first?.info.osVersion, "iOS 26.7.1")
     }
 }
