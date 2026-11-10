@@ -20,10 +20,12 @@ final class ChargeLimitTests: XCTestCase {
 
     func testHeldAtLimit() {
         let held = BatteryReading(level: 80, isCharging: false, externalPower: true, chargeLimit: 80)
-        let overshoot = BatteryReading(level: 84, isCharging: true, externalPower: true, chargeLimit: 80)
+        let chargingAtLimit = BatteryReading(level: 80, isCharging: true, externalPower: true, chargeLimit: 80)
+        let pastLimit = BatteryReading(level: 84, isCharging: false, externalPower: true, chargeLimit: 80)
 
         XCTAssertTrue(held.isHeldAtLimit)
-        XCTAssertFalse(overshoot.isHeldAtLimit)
+        XCTAssertFalse(chargingAtLimit.isHeldAtLimit)
+        XCTAssertFalse(pastLimit.isHeldAtLimit)
     }
 }
 
