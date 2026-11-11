@@ -20,7 +20,7 @@ final class PersistStateTests: XCTestCase {
 
     private func written(_ snapshots: Snapshot...) -> PersistState {
         var state = PersistState()
-        for snapshot in snapshots { try! state.writeIfNeeded(snapshot) { _ in } }
+        for snapshot in snapshots { _ = try! state.writeIfNeeded(snapshot) { _ in } }
         return state
     }
 
@@ -52,6 +52,15 @@ final class PersistStateTests: XCTestCase {
 
         XCTAssertThrowsError(try state.writeIfNeeded(snapshot(at: 0)) { _ in throw SaveFailed() })
         XCTAssertTrue(try state.writeIfNeeded(snapshot(at: 1)) { _ in })
+    }
+
+    func testHistoryAppendIsSkippedWhenNotDue() throws {
+        var state = PersistState()
+        var appendCount = 0
+
+        try state.appendHistoryIfNeeded(snapshot(at: 0)) { _ in appendCount += 1 }
+        try state.appendHistoryIfNeeded(snapshot(at: 1)) { _ in appendCount += 1 }
+        XCTAssertEqual(appendCount, 1)
     }
 
     func testFailedHistoryAppendThrowsAndIsRetriedNextTime() throws {
