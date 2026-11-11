@@ -21,11 +21,17 @@ public struct PersistState: Equatable, Sendable {
         snapshot.observedAt.timeIntervalSince(historyAppendedAt ?? .distantPast) >= Self.historyInterval
     }
 
-    public mutating func didWrite(_ snapshot: Snapshot) {
+    @discardableResult
+    public mutating func writeIfNeeded(_ snapshot: Snapshot, using write: (Snapshot) throws -> Void) throws -> Bool {
+        guard needsWrite(snapshot) else { return false }
+        try write(snapshot)
         written = snapshot
+        return true
     }
 
-    public mutating func didAppendHistory(_ snapshot: Snapshot) {
+    public mutating func appendHistoryIfNeeded(_ snapshot: Snapshot, using append: (Snapshot) throws -> Void) throws {
+        guard needsHistory(snapshot) else { return }
+        try append(snapshot)
         historyAppendedAt = snapshot.observedAt
     }
 }

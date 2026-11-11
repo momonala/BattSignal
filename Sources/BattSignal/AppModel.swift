@@ -95,23 +95,16 @@ final class AppModel: ObservableObject {
     private func record(_ snapshot: Snapshot) {
         var state = persist[snapshot.device.id, default: PersistState()]
 
-        if state.needsWrite(snapshot) {
-            do {
-                try store.write(snapshot)
-                state.didWrite(snapshot)
-                saveProblem = nil
-            } catch {
-                saveProblem = "Couldn't save to iCloud Drive: \(error.localizedDescription)"
-            }
+        do {
+            if try state.writeIfNeeded(snapshot, using: store.write) { saveProblem = nil }
+        } catch {
+            saveProblem = "Couldn't save to iCloud Drive: \(error.localizedDescription)"
         }
 
-        if state.needsHistory(snapshot) {
-            do {
-                try store.appendHistory(snapshot)
-                state.didAppendHistory(snapshot)
-            } catch {
-                log.error("History append for \(snapshot.device.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
-            }
+        do {
+            try state.appendHistoryIfNeeded(snapshot, using: store.appendHistory)
+        } catch {
+            log.error("History append for \(snapshot.device.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
         }
 
         persist[snapshot.device.id] = state

@@ -16,15 +16,17 @@ final class PersistStateTests: XCTestCase {
         )
     }
 
-    private func written(_ snapshot: Snapshot) -> PersistState {
+    private struct SaveFailed: Error {}
+
+    private func written(_ snapshots: Snapshot...) -> PersistState {
         var state = PersistState()
-        state.didWrite(snapshot)
+        for snapshot in snapshots { try! state.writeIfNeeded(snapshot) { _ in } }
         return state
     }
 
-    private func appended(_ snapshot: Snapshot) -> PersistState {
+    private func appended(_ snapshots: Snapshot...) -> PersistState {
         var state = PersistState()
-        state.didAppendHistory(snapshot)
+        for snapshot in snapshots { try! state.appendHistoryIfNeeded(snapshot) { _ in } }
         return state
     }
 
@@ -32,11 +34,33 @@ final class PersistStateTests: XCTestCase {
         XCTAssertTrue(PersistState().needsWrite(snapshot(at: 0)))
     }
 
-    func testUnwrittenObservationIsRetried() {
-        var state = PersistState()
-        state.didAppendHistory(snapshot(at: 0))
+    func testHistoryAloneDoesNotCountAsWritten() {
+        XCTAssertTrue(appended(snapshot(at: 0)).needsWrite(snapshot(at: 1)))
+    }
 
-        XCTAssertTrue(state.needsWrite(snapshot(at: 1)))
+    func testSuccessfulWriteIsRecordedAndReported() throws {
+        var state = PersistState()
+        var saved: [Snapshot] = []
+
+        XCTAssertTrue(try state.writeIfNeeded(snapshot(at: 0)) { saved.append($0) })
+        XCTAssertFalse(try state.writeIfNeeded(snapshot(at: 1)) { saved.append($0) })
+        XCTAssertEqual(saved, [snapshot(at: 0)])
+    }
+
+    func testFailedWriteThrowsAndIsRetriedNextTime() throws {
+        var state = PersistState()
+
+        XCTAssertThrowsError(try state.writeIfNeeded(snapshot(at: 0)) { _ in throw SaveFailed() })
+        XCTAssertTrue(try state.writeIfNeeded(snapshot(at: 1)) { _ in })
+    }
+
+    func testFailedHistoryAppendThrowsAndIsRetriedNextTime() throws {
+        var state = PersistState()
+        var appendedAt: [Date] = []
+
+        XCTAssertThrowsError(try state.appendHistoryIfNeeded(snapshot(at: 0)) { _ in throw SaveFailed() })
+        try state.appendHistoryIfNeeded(snapshot(at: 1)) { appendedAt.append($0.observedAt) }
+        XCTAssertEqual(appendedAt, [Date(timeIntervalSince1970: 1)])
     }
 
     func testLevelChangeIsWrittenImmediately() {
@@ -59,6 +83,10 @@ final class PersistStateTests: XCTestCase {
         XCTAssertTrue(state.needsWrite(snapshot(at: 601)))
     }
 
+    func testRewriteRestartsTheWriteClock() {
+        XCTAssertFalse(written(snapshot(at: 0), snapshot(at: 600)).needsWrite(snapshot(at: 601)))
+    }
+
     func testFirstHistoryPointIsAppended() {
         XCTAssertTrue(PersistState().needsHistory(snapshot(at: 0)))
     }
@@ -69,6 +97,10 @@ final class PersistStateTests: XCTestCase {
         XCTAssertFalse(state.needsHistory(snapshot(at: 869)))
         XCTAssertTrue(state.needsHistory(snapshot(at: 870)))
         XCTAssertTrue(state.needsHistory(snapshot(at: 871)))
+    }
+
+    func testAppendRestartsTheHistoryClock() {
+        XCTAssertFalse(appended(snapshot(at: 0), snapshot(at: 870)).needsHistory(snapshot(at: 871)))
     }
 
     func testWriteAndHistoryThrottlesAreIndependent() {
