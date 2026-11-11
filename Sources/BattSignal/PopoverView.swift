@@ -57,11 +57,11 @@ struct FooterView: View {
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
                     .foregroundStyle(.tertiary)
                 Spacer()
-                SuccessCheck(trigger: model.lastScanSucceededAt)
+                SuccessCheck(trigger: model.scanState.lastSucceededAt)
                 Button("Scan now") {
                     Task { await model.scanDevices() }
                 }
-                .disabled(model.isScanning)
+                .disabled(model.scanState.isScanning)
                 Button("Quit") { NSApplication.shared.terminate(nil) }
             }
             .font(.caption)

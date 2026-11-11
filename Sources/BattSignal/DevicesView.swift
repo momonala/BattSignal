@@ -40,13 +40,13 @@ struct DevicesView: View {
             .animation(Motion.animation(Motion.reveal, reduceMotion: reduceMotion), value: model.devices.map(\.id))
             .animation(Motion.animation(Motion.reveal, reduceMotion: reduceMotion), value: expandedID)
 
-            if model.isScanning {
+            if model.scanState.isScanning {
                 Text("Looking for iPhones and iPads on this Wi-Fi…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .shimmer(true)
                     .transition(.opacity)
-            } else if let problem = model.scanProblem ?? model.saveProblem {
+            } else if let problem = model.scanState.problem?.message ?? model.saveProblem {
                 Label(problem, systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)

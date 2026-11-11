@@ -8,11 +8,9 @@ private let log = Logger(subsystem: "org.mnalavadi.battsignal", category: "model
 final class AppModel: ObservableObject {
     @Published private(set) var local: Snapshot?
     @Published private(set) var devices: [Snapshot] = []
-    @Published private(set) var scanProblem: String?
+    @Published private(set) var scanState: ScanState = .idle
     @Published private(set) var saveProblem: String?
-    @Published private(set) var isScanning = false
     @Published private(set) var lastUpdated: Date?
-    @Published private(set) var lastScanSucceededAt: Date?
 
     private(set) var host = HostIdentity.current()
     let store = FleetStore(root: FleetStore.iCloudRoot)
@@ -66,13 +64,12 @@ final class AppModel: ObservableObject {
     }
 
     func scanDevices() async {
-        guard !isScanning else { return }
+        guard !scanState.isScanning else { return }
         guard let cli else {
-            scanProblem = "pymobiledevice3 isn't installed, so iPhones and iPads can't be read."
+            scanState = scanState.applying(.toolMissing)
             return
         }
-        isScanning = true
-        defer { isScanning = false }
+        scanState = scanState.applying(.started)
 
         do {
             let found = try await cli.listDevices()
@@ -86,14 +83,11 @@ final class AppModel: ObservableObject {
                     failures.append(device.name)
                 }
             }
-            if !found.isEmpty, failures.isEmpty { lastScanSucceededAt = .now }
-            scanProblem = failures.isEmpty
-                ? nil
-                : "Couldn't read \(failures.joined(separator: ", ")). It may be asleep or off this Wi-Fi."
+            scanState = scanState.applying(.listed(deviceCount: found.count, failures: failures, at: .now))
         } catch {
-            scanProblem = "Scan failed: \(error.localizedDescription)"
+            scanState = scanState.applying(.listFailed(error.localizedDescription))
         }
-        log.notice("Scan finished: \(self.scanProblem ?? "ok", privacy: .public)")
+        log.notice("Scan finished: \(self.scanState.problem?.message ?? "ok", privacy: .public)")
         reloadFleet()
     }
 
