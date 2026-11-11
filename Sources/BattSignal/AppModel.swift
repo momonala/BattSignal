@@ -17,14 +17,11 @@ final class AppModel: ObservableObject {
     private let cli = MobileDeviceCLI.locate()
     private let defaults = UserDefaults.standard
 
-    private var lastWrite: [String: (at: Date, reading: BatteryReading)] = [:]
-    private var lastHistory: [String: Date] = [:]
+    private var persist: [String: PersistState] = [:]
     private var loops: [Task<Void, Never>] = []
     private var powerWatcher: PowerSourceWatcher?
 
     private static let localInterval: Duration = .seconds(60)
-    private static let observationMaxAge: TimeInterval = 10 * 60
-    private static let historyInterval: TimeInterval = 15 * 60 - 30
 
 
     init() {
@@ -96,32 +93,28 @@ final class AppModel: ObservableObject {
     }
 
     private func record(_ snapshot: Snapshot) {
-        let id = snapshot.device.id
+        var state = persist[snapshot.device.id, default: PersistState()]
 
-        let changed = lastWrite[id].map {
-            $0.reading.level != snapshot.battery.level
-                || $0.reading.isCharging != snapshot.battery.isCharging
-                || $0.reading.externalPower != snapshot.battery.externalPower
-                || snapshot.observedAt.timeIntervalSince($0.at) >= Self.observationMaxAge
-        } ?? true
-        if changed {
+        if state.needsWrite(snapshot) {
             do {
                 try store.write(snapshot)
-                lastWrite[id] = (snapshot.observedAt, snapshot.battery)
+                state.didWrite(snapshot)
                 saveProblem = nil
             } catch {
                 saveProblem = "Couldn't save to iCloud Drive: \(error.localizedDescription)"
             }
         }
 
-        if snapshot.observedAt.timeIntervalSince(lastHistory[id] ?? .distantPast) >= Self.historyInterval {
+        if state.needsHistory(snapshot) {
             do {
                 try store.appendHistory(snapshot)
-                lastHistory[id] = snapshot.observedAt
+                state.didAppendHistory(snapshot)
             } catch {
                 log.error("History append for \(snapshot.device.name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             }
         }
+
+        persist[snapshot.device.id] = state
     }
 
     private func reloadFleet() {
